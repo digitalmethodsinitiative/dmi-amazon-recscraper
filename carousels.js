@@ -29,6 +29,29 @@
             }
         }
 
+        //get item data (the item is not in any lists)
+        let own_title = document.getElementById('productTitle');
+        if(!own_title) {
+            return {};
+        }
+
+        let own_price = document.querySelectorAll('span.header-price')[0];
+        own_price = own_price ? own_price.innerText : null;
+
+        let own_img = document.querySelectorAll('img.frontImage')[0];
+        own_img = own_img ? own_img.getAttribute('src') : null;
+
+        let item_metadata = {
+            asin: document.location.href.split('/dp/')[1].split('/')[0],
+            label: own_title.innerText,
+            author: null,
+            rank: 0,
+            link: document.location.href.split('?')[0],
+            thumbnail: own_img,
+            price: own_price,
+            is_seed: true
+        }
+
         //first scroll to the bottom of the page - slowly! to make sure all carousels load
         while (document.documentElement.scrollTop < document.documentElement.scrollHeight - window.innerHeight) {
             document.documentElement.scrollTop += 100;
@@ -78,7 +101,7 @@
 
             carousel_name = carousel_name.innerText;
             let sponsored = carousel_name.indexOf('Sponsor') >= 0;
-            let carousel_items = [];
+            let carousel_items = [item_metadata];
             let rank = 1;
             carousel_name = carousel_name.split("\n")[0];
 

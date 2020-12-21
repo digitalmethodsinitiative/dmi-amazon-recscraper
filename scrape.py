@@ -56,7 +56,7 @@ def gdf_escape(string):
     if not string:
         return '""'
 
-    return '"' + string.replace('"', '\"') + '"'
+    return '"' + string.replace('"', '\"').strip() + '"'
 
 
 def generate_recommendation_network(seeds, depth=0, prefix=""):
@@ -93,7 +93,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
 
     # these are kind of arbitrary, but seem to work
     browser.set_page_load_timeout(15)
-    browser.set_script_timeout(90)
+    browser.set_script_timeout(120)
     browser.implicitly_wait(5)
 
     seed_asins = set()
@@ -121,6 +121,10 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
 
             # get the actual recommendations - this will typically take a while
             recommendations = get_recommendations(seed, browser)
+            if not recommendations:
+                print("- no results, link may be invalid")
+                continue
+
             seed_asin = seed.split("/dp/")[1].split("/")[0]
 
             # process recommendations
@@ -132,9 +136,6 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
                     metadata = item.copy()
                     if metadata["link"][0:4] != "http":
                         metadata["link"] = amazon_host + metadata["link"]
-
-                    # not sure what to do with this...
-                    del metadata["rank"]
 
                     asin = item["asin"]
                     if asin not in items:
@@ -149,9 +150,10 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
 
                     # store the pair as a simple a-b string. using a hashable
                     # type here (i.e. a string) allows using a set to store
-                    # them, which automatically elimiates duplicates
-                    pair = "-".join([seed_asin, asin])
-                    links[list_title].add(pair)
+                    # them, which automatically eliminates duplicates
+                    if seed_asin != asin:
+                        pair = "-".join([seed_asin, asin])
+                        links[list_title].add(pair)
 
         # the new seeds are the old seeds - prepare for next iteration (if
         # needed)
@@ -161,7 +163,10 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
     browser.close()
 
     # write GDF file
+    print("Generating networks for the following recommendation lists:")
+
     for list_title, list_pairs in links.items():
+        print("- %s" % list_title)
         # only include items that actually appear in this list
         asins = set().union(*itertools.chain([pair.split("-") for pair in list_pairs]))
 
@@ -171,7 +176,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
 
         with open(filename, "w") as output:
             output.write(
-                "nodedef>id VARCHAR, name VARCHAR,author VARCHAR,url VARCHAR,price VARCHAR,thumbnail VARCHAR,is_seed BOOLEAN\n")
+                "nodedef>name VARCHAR, title VARCHAR,author VARCHAR,url VARCHAR,price VARCHAR,thumbnail VARCHAR,is_seed BOOLEAN\n")
             for asin, item in items.items():
                 if asin not in asins:
                     continue
@@ -183,13 +188,14 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
             output.write("edgedef>from VARCHAR,to VARCHAR,directed BOOLEAN\n")
             for pair in list_pairs:
                 pair = pair.split("-")
-                output.write("%s,%s,true\n" % tuple(pair))
+                output.write("%s,%s,true\n" % tuple([gdf_escape(bit) for bit in pair]))
+
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
     cli.add_argument("-i", "--input", help="File with product page URLs to scrape, one per line", required=True)
     cli.add_argument("-d", "--depth", default=0, help="Crawl depth, default 0")
-    cli.add_argument("-p", "--prefix", default="", help="File name prefix for the output GDF files")
+    cli.add_argument("-p", "--prefix", default="results/", help="File name prefix for the output GDF files")
     args = cli.parse_args()
 
     seeds = open(args.input).readlines()
