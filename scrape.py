@@ -1,8 +1,8 @@
 from selenium import webdriver
-# from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import JavascriptException, TimeoutException
 
+import os
 import re
 import itertools
 import argparse
@@ -103,7 +103,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
     while current_depth <= depth:
         # we use ASINs as unique identifiers - they can be found at a
         # predictable place in the product page URL
-        seed_asins |= set([seed.split("/dp/")[1].split("/")[0] for seed in seeds])
+        seed_asins |= set([re.split("/(d|g)p/", seed)[1].split("/")[0] for seed in seeds])
         if not initial_asins:
             initial_asins = seed_asins
 
@@ -125,7 +125,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
                 print("- no results, link may be invalid")
                 continue
 
-            seed_asin = seed.split("/dp/")[1].split("/")[0]
+            seed_asin = re.split("/(d|g)p/", seed)[1].split("/")[0]
 
             # process recommendations
             for list_title, list_items in recommendations.items():
@@ -170,9 +170,15 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
         # only include items that actually appear in this list
         asins = set().union(*itertools.chain([pair.split("-") for pair in list_pairs]))
 
+        # prefix filename if requested
         filename = list_title.replace(" ", "-") + ".gdf"
         if prefix:
             filename = prefix + "-" + filename
+
+        # if the output directory doesn't exist create it
+        output_dir = os.path.dirname(filename)
+        if output_dir and not os.path.isdir(output_dir):
+            os.makedirs(output_dir)
 
         with open(filename, "w") as output:
             output.write(
@@ -195,7 +201,7 @@ if __name__ == "__main__":
     cli = argparse.ArgumentParser()
     cli.add_argument("-i", "--input", help="File with product page URLs to scrape, one per line", required=True)
     cli.add_argument("-d", "--depth", default=0, help="Crawl depth, default 0")
-    cli.add_argument("-p", "--prefix", default="results/", help="File name prefix for the output GDF files")
+    cli.add_argument("-p", "--prefix", default="results", help="File name prefix for the output GDF files")
     args = cli.parse_args()
 
     seeds = open(args.input).readlines()

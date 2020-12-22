@@ -43,7 +43,7 @@ as [Gephi](https://gephi.org).
 There are other command-line parameters too:
 
 ```
-python scrape.py --input seeds.txt --depth 1 --prefix /results/
+python scrape.py --input seeds.txt --depth 1 --prefix seeds-txt-depth-1
 ```
 
 Try `python scrape.py --help` for a full list. Be very careful with the 
