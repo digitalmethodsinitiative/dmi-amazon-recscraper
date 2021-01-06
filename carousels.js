@@ -42,7 +42,7 @@
         own_img = own_img ? own_img.getAttribute('src') : null;
 
         let item_metadata = {
-            asin: document.location.href.split('/dp/')[1].split('/')[0],
+            asin: document.location.href.split(/(d|g)p/)[1].split('/')[0],
             label: own_title.innerText,
             author: null,
             rank: 0,
