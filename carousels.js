@@ -122,6 +122,11 @@
                         continue;
                     }
 
+                    if (!link.match(/\/[dg]p\//g) || link.match(/picassoRedirect\.html/g)) {
+                        //skip non-product links
+                        continue;
+                    }
+
                     let img = carousel_item.getElementsByTagName('img')[0];
                     img = img ? img.getAttribute('src') : null;
 
@@ -161,10 +166,14 @@
                     };
                     rank += 1;
                     carousel_items.push(item_data)
+
+                    if(carousel_items.length > window.max_carousel_items) {
+                        break;
+                    }
                 }
 
                 current_page += 1;
-                if (current_page < page_count) {
+                if (current_page < page_count && carousel_items.length < window.max_carousel_items) {
                     let button = parent.querySelectorAll('.a-carousel-goto-nextpage')[0];
                     if (!button) {
                         break;

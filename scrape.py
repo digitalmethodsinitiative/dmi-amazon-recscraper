@@ -6,6 +6,7 @@ import os
 import re
 import itertools
 import argparse
+import time
 
 
 def stealthify_browser(browser):
@@ -17,7 +18,7 @@ def stealthify_browser(browser):
     browser.execute_script(open("stealthify.js").read())
 
 
-def get_recommendations(url, browser):
+def get_recommendations(url, browser, max_carousel_items=50):
     """
     Get Amazon recommendations for a given URL
 
@@ -27,6 +28,7 @@ def get_recommendations(url, browser):
 
     :param str url:  Amazon item page URL to scrape
     :param browser:  Selenium WebDriver instance to scrape with
+    :param int max_carousel_items:  Max items to scrape per recommendation carousel
     :return dict:  A dictionary, with an item for each found recommendation
     list, that item being a dictionary with two items, "sponsored" (a boolean)
     and "items" (a list of items in that list)
@@ -36,6 +38,8 @@ def get_recommendations(url, browser):
     try:
         browser.get(url)
         carousel_scrape = open("carousels.js").read()
+
+        browser.execute_script("window.max_carousel_items = %i;" % max_carousel_items)
         recommendations = browser.execute_script("return %s" % carousel_scrape)
         return recommendations
     except JavascriptException as e:
@@ -59,7 +63,7 @@ def gdf_escape(string):
     return '"' + string.replace('"', '\"').strip() + '"'
 
 
-def generate_recommendation_network(seeds, depth=0, prefix=""):
+def generate_recommendation_network(seeds, depth=0, prefix="", max_carousel_items=50):
     """
     Generate GDF files for the recommendations for the seed URLs
 
@@ -77,6 +81,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
     :param list seeds: A list of Amazon product page URLs to scrape
     :param int depth:  Depth for the scrape, defaults to 0. If the depth is 1,
     all recommendations found in the first iteration will also be scraped, and
+    :param int max_carousel_items:  Max items to scrape per recommendation carousel
     :param str prefix:  File prefix
     so on. Careful!
     """
@@ -120,7 +125,7 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
             progress += 1
 
             # get the actual recommendations - this will typically take a while
-            recommendations = get_recommendations(seed, browser)
+            recommendations = get_recommendations(seed, browser, max_carousel_items)
             if not recommendations:
                 print("- no results, link may be invalid")
                 continue
@@ -166,21 +171,27 @@ def generate_recommendation_network(seeds, depth=0, prefix=""):
     print("Generating networks for the following recommendation lists:")
 
     for list_title, list_pairs in links.items():
-        print("- %s" % list_title)
+        if not list_pairs:
+            print("- %s (empty, skipping)" % list_title)
+            continue
+
+        print("- %s (%i recommendations)" % (list_title, len(list_pairs)))
         # only include items that actually appear in this list
         asins = set().union(*itertools.chain([pair.split("-") for pair in list_pairs]))
 
         # prefix filename if requested
-        filename = list_title.replace(" ", "-") + ".gdf"
+        # remove characters invalid in windows filenames
+        filename = re.sub(r'<>:"/\\\|\?\*', '', list_title.replace(" ", "-")) + ".gdf"
         if prefix:
             filename = prefix + "-" + filename
+            filename = filename.replace("#", str(int(time.time())))
 
         # if the output directory doesn't exist create it
         output_dir = os.path.dirname(filename)
         if output_dir and not os.path.isdir(output_dir):
             os.makedirs(output_dir)
 
-        with open(filename, "w") as output:
+        with open(filename, "w", encoding="utf-8") as output:
             output.write(
                 "nodedef>name VARCHAR, title VARCHAR,author VARCHAR,url VARCHAR,price VARCHAR,thumbnail VARCHAR,is_seed BOOLEAN\n")
             for asin, item in items.items():
@@ -201,8 +212,10 @@ if __name__ == "__main__":
     cli = argparse.ArgumentParser()
     cli.add_argument("-i", "--input", help="File with product page URLs to scrape, one per line", required=True)
     cli.add_argument("-d", "--depth", default=0, help="Crawl depth, default 0")
-    cli.add_argument("-p", "--prefix", default="results", help="File name prefix for the output GDF files")
+    cli.add_argument("-c", "--carousel-items", default=50, help="Max amount of products to scrape per carousel")
+    cli.add_argument("-p", "--prefix", default="results/#", help="File name prefix for the output GDF files (# is replaced with current time)")
     args = cli.parse_args()
 
     seeds = open(args.input).readlines()
-    generate_recommendation_network(seeds, int(args.depth), args.prefix)
+    carousel_items = int(args.carousel_items)
+    generate_recommendation_network(seeds, int(args.depth), args.prefix, carousel_items)
