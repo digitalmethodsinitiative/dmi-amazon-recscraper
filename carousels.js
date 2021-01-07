@@ -108,12 +108,12 @@
             //carousels may have multiple pages we need to iterate through - find out how
             //many. we stop at 10 pages since, well, come on
             let page_count = parent.querySelectorAll('span.a-carousel-page-max')[0];
-            page_count = page_count ? parseInt(page_count.innerText) : 1;
-            page_count = Math.min(page_count, 10);
+            page_count = page_count && !isNaN(page_count) ? parseInt(page_count.innerText) : 1;
+            page_count = Math.min(page_count, 9);
             let current_page = 0;
 
             //now scrape items from each carousel page
-            while (current_page < page_count) {
+            while (current_page <= page_count) {
                 for (const carousel_item of carousel.querySelectorAll('li.a-carousel-card:not(.a-carousel-card-empty)')) {
                     let link = carousel_item.querySelectorAll('a.a-link-normal')[0];
                     link = link ? link.getAttribute('href').split('?')[0] : null;
